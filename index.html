@@ -13,7 +13,8 @@
   h1{font-size:22px;font-weight:900;text-align:center;margin:8px 0 4px;color:#FBF4E4;}
   .sub{text-align:center;font-size:13px;color:#C9BBA3;margin-bottom:24px;}
   label{display:block;font-size:13px;font-weight:700;color:var(--gold-bright);margin:16px 0 6px;}
-  input[type=tel],input[type=email]{width:100%;padding:12px 14px;border-radius:8px;border:1px solid var(--brown-light);background:#2E2014;color:#FBF4E4;font-size:15px;}
+  input[type=tel],input[type=email],select{width:100%;padding:12px 14px;border-radius:8px;border:1px solid var(--brown-light);background:#2E2014;color:#FBF4E4;font-size:15px;}
+  select{appearance:none;-webkit-appearance:none;background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%23E8C46A" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>');background-repeat:no-repeat;background-position:right 14px center;background-size:18px;}
   .chips{display:flex;flex-wrap:wrap;gap:8px;}
   .chip{padding:8px 14px;border-radius:999px;border:1px solid var(--brown-light);font-size:13px;cursor:pointer;background:#2E2014;color:#EDE3D3;}
   .chip.active{background:var(--gold-bright);color:var(--brown-deep);border-color:var(--gold-bright);font-weight:700;}
@@ -42,16 +43,21 @@
     <label>Email（選填）</label>
     <input type="email" id="email">
     <label>年齡區間（選填）</label>
-    <div class="chips" id="ageRange">
-      <div class="chip" data-v="18-24">18-24</div><div class="chip" data-v="25-34">25-34</div>
-      <div class="chip" data-v="35-44">35-44</div><div class="chip" data-v="45-54">45-54</div>
-      <div class="chip" data-v="55以上">55以上</div>
-    </div>
+    <select id="ageRange">
+      <option value="">請選擇</option>
+      <option value="18-24">18-24</option>
+      <option value="25-34">25-34</option>
+      <option value="35-44">35-44</option>
+      <option value="45-54">45-54</option>
+      <option value="55以上">55以上</option>
+    </select>
     <label>性別（選填）</label>
-    <div class="chips" id="gender">
-      <div class="chip" data-v="男">男</div><div class="chip" data-v="女">女</div>
-      <div class="chip" data-v="不便透露">不便透露</div>
-    </div>
+    <select id="gender">
+      <option value="">請選擇</option>
+      <option value="男">男</option>
+      <option value="女">女</option>
+      <option value="不便透露">不便透露</option>
+    </select>
     <label>喜歡喝的酒（可複選）</label>
     <div class="chips" id="drinks">
       <div class="chip" data-v="威士忌">威士忌</div><div class="chip" data-v="紅酒">紅酒</div>
@@ -72,15 +78,20 @@
       <div class="name" id="cardName"></div>
       <div class="tag">一般會員</div>
     </div>
-    <div class="done-msg">加入成功！歡迎來到酒教俱樂部，期待在品酒會上見到你。</div>
+    <div class="done-msg">陸續公布黑卡會員資格與福利。</div>
   </div>
 </div>
 <script>
   var LIFF_ID = "2012062363-C9NO5w27";
   var GAS_ENDPOINT = "https://script.google.com/macros/s/AKfycbx7zJ3KqW8sBsjfjUn3f-uNQkx6_zWfxtbyyUkoAYp7QUMxTIq4H_o6CaQ14fclmz4/exec";
   var profile = null;
-  var selected = { drinks: [], events: [], ageRange: "", gender: "" };
+  var selected = { drinks: [], events: [] };
   function show(id){ ["loading","form-view","card-view"].forEach(function(x){ document.getElementById(x).style.display = x===id ? "block":"none"; }); }
+  function showCard(){
+    document.getElementById("cardPic").src = (profile && profile.pictureUrl) || "";
+    document.getElementById("cardName").innerText = profile ? profile.displayName : "";
+    show("card-view");
+  }
   show("loading");
   liff.init({ liffId: LIFF_ID }).then(function(){
     if (!liff.isLoggedIn()) { liff.login(); return; }
@@ -88,7 +99,17 @@
   }).then(function(p){
     if (!p) return;
     profile = p;
-    show("form-view");
+    return fetch(GAS_ENDPOINT + "?uid=" + encodeURIComponent(p.userId));
+  }).then(function(r){
+    if (!r) return null;
+    return r.json();
+  }).then(function(res){
+    if (!profile) return;
+    if (res && res.exists) {
+      showCard();
+    } else {
+      show("form-view");
+    }
   }).catch(function(err){
     document.getElementById("loading").innerHTML = "<div class=\"sub\">載入失敗，請用 LINE 打開這個連結</div>";
     show("loading");
@@ -105,17 +126,6 @@
   }
   bindChips("drinks","drinks");
   bindChips("events","events");
-  function bindSingleChips(containerId, key){
-    document.querySelectorAll("#"+containerId+" .chip").forEach(function(el){
-      el.addEventListener("click", function(){
-        document.querySelectorAll("#"+containerId+" .chip").forEach(function(o){ o.classList.remove("active"); });
-        el.classList.add("active");
-        selected[key] = el.getAttribute("data-v");
-      });
-    });
-  }
-  bindSingleChips("ageRange","ageRange");
-  bindSingleChips("gender","gender");
   function submitForm(){
     var phone = document.getElementById("phone").value.trim();
     if (!phone) { alert("請填寫聯絡電話"); return; }
@@ -126,8 +136,8 @@
       lineName: profile.displayName,
       phone: phone,
       email: document.getElementById("email").value.trim(),
-      ageRange: selected.ageRange,
-      gender: selected.gender,
+      ageRange: document.getElementById("ageRange").value,
+      gender: document.getElementById("gender").value,
       drinks: selected.drinks,
       events: selected.events
     };
@@ -136,9 +146,7 @@
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify(payload)
     }).then(function(r){ return r.json(); }).then(function(res){
-      document.getElementById("cardPic").src = profile.pictureUrl || "";
-      document.getElementById("cardName").innerText = profile.displayName;
-      show("card-view");
+      showCard();
     }).catch(function(){
       btn.disabled = false; btn.innerText = "加入成為會員";
       alert("送出失敗，請再試一次");
